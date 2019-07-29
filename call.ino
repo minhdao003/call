@@ -21,6 +21,7 @@
 #include <Ethernet2.h>
 #include <Keypad.h>
 #include <ArduinoJson.h>
+#include <string.h>
 
 const int buzzer = 12; 
 const int led = 47;
@@ -56,9 +57,9 @@ char varkey4;
 byte mac[] = {
   0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED
 };
-int parts[4] = {192,168,0,177};
-String ipstring = String(parts[0]) + "." + String(parts[1]) + "." + (parts[2]) + "." + String(parts[3]);
-IPAddress ip(parts[0], parts[1], parts[2], parts[3]);
+
+const char ipstring[15] = "192.168.0.177";
+IPAddress ip(192,168,0,177);
 IPAddress gateway(192, 168, 0, 1);
 IPAddress subnet(255, 255, 255, 0);
 IPAddress ipServer(192, 168, 0, 100);
