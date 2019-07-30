@@ -40,7 +40,7 @@ byte colPins[COLS] = {9,8,7,6}; //connect to the column pinouts of the keypad
 Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
 
 char previousKey = ' ';
-bool key1 = false;
+bool enterKey = false;
 bool key2 = false;
 bool key3 = false;
 bool key4 = false;
@@ -72,9 +72,13 @@ boolean alreadyConnected = false; // whether or not the client was connected pre
 int incomingByte = 0;   // dùng để lưu giá trị được gửi
 String str;
 
-StaticJsonDocument<200> json;
-StaticJsonDocument<200> doc;
-
+StaticJsonDocument<200> docEnter;
+StaticJsonDocument<200> docCall;
+StaticJsonDocument<200> docRecall;
+StaticJsonDocument<200> docStore;
+bool flagNumber = false;
+int number[4] = {-1,-1,-1,-1};
+int service;
 
 void setup() {
   pinMode(buzzer, OUTPUT);
@@ -126,11 +130,12 @@ void loop() {
 
     if (client.available() > 0) {
       // read the bytes incoming from the client:
-      char thisChar = client.read();
+//      char thisChar = client.read();
       // echo the bytes back to the client:
-      server.write(thisChar);
+//      server.write(thisChar);
       // echo the bytes to the server as well:
 //      Serial.write(thisChar);
+        parser();
     }
     
   }
@@ -138,12 +143,28 @@ void loop() {
 }
 
 
-void parser(char doc){
-  DeserializationError error = deserializeJson(json, doc);
+void parser(){
+  const size_t capacity = JSON_OBJECT_SIZE(3) + JSON_ARRAY_SIZE(2) + 60;
+  DynamicJsonDocument docParser(capacity);
+
+  // Parse JSON object
+  DeserializationError error = deserializeJson(docParser, client);
   if (error) {
     Serial.print(F("deserializeJson() failed: "));
     Serial.println(error.c_str());
-    return;
+  } else {
+    Serial.print(docParser["number"][0].as<int>());
+    Serial.print(docParser["number"][1].as<int>());
+    Serial.print(docParser["number"][2].as<int>());
+    Serial.print(docParser["number"][3].as<int>());
+    
+    number[0] = docParser["number"][0].as<int>();
+    number[1] = docParser["number"][1].as<int>();
+    number[2] = docParser["number"][2].as<int>();
+    number[3] = docParser["number"][3].as<int>();
+
+    service = docParser["service"].as<int>();
+    flagNumber = true;
   }
 }
 
@@ -154,44 +175,62 @@ void getkey(){
     switch (key) {
       case 'A':
         previousKey = key;
-        key1 = false;
         key2 = false;
         key3 = false;
         key4 = false;
         break;
       case 'D': // Enter
-        
-        doc["action"] = "enter";
-        doc["ip"] = ipstring;
-        serializeJson(doc, client);     
+        docEnter["action"] = "enter";
+        docEnter["ip"] = ipstring;      
+        serializeJson(docEnter, client);
+
+        enterKey = true;
+        flagNumber = false;     
         break;
 
       case 'C': //Call
 //        char data4 = "{\"timestamp\":1564658642,\"action\":\"callnumber\",\"ip\": \"192.168.0.177\"}";
-        doc["action"] = "callnumber";  
-        doc["ip"] = ipstring;
-        serializeJson(doc, client);
+        if (enterKey == true) {
+          docCall["action"] = "callnumber";  
+          docCall["ip"] = ipstring;
+          serializeJson(docCall, client);
+        } else {
+          if (flagNumber == true) {
+            docRecall["action"] = "recall";   
+            docRecall["service"] = service;
+            JsonArray data = docRecall.createNestedArray("number");
+            data.add(number[0]);
+            data.add(number[1]);
+            data.add(number[2]);
+            data.add(number[3]);
+            serializeJson(docRecall, client);
+          } else {
+            docCall["action"] = "callnumber";  
+            docCall["ip"] = ipstring;
+            serializeJson(docCall, client);
+          }
+        }
+        enterKey = false;      
+        break;
         
+      case '*': //Store
+//      data1 = "{\"timestamp\":1564658642,\"action\":\"addnumber\",\"service\":1,\"number\":\[0,0,0,2]\}"; //add number
+        if (flagNumber) {
+          docStore["action"] = "addnumber";  
+          docStore["service"] = service;
+          JsonArray data = docStore.createNestedArray("number");
+          data.add(number[0]);
+          data.add(number[1]);
+          data.add(number[2]);
+          data.add(number[3]);
+          serializeJson(docStore, client);
+        }
+        enterKey = true;
+        flagNumber = false;  
         break;
     }
     if (key >= '0' && key <='9' && previousKey == 'A'){
       Serial.print(key);
-//      Serial.print('\n');
-
-      if (key1 == false){
-        key1 = true;
-        varkey1 = key;
-      } else if (key2 == false){
-        key2 = true;
-        varkey2 = key;
-      } else if (key3 == false){
-        key3 = true;
-        varkey3 = key;
-      } else if (key4 == false){
-        key4 = true;
-        varkey4 = key;
-      }
-
       delay(100);
     }
     
