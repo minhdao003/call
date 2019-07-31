@@ -20,8 +20,22 @@
 #include <SPI.h>
 #include <Ethernet2.h>
 #include <Keypad.h>
+#include "Adafruit_GFX.h"
+#include "Adafruit_ILI9341.h"
 #include <ArduinoJson.h>
 #include <string.h>
+
+
+// For the LCD.
+#define TFT_DC 49
+#define TFT_CS 48
+#define TFT_MOSI 51
+#define TFT_CLK 10
+#define TFT_RST 9
+#define TFT_MISO 50
+
+// Use hardware SPI (on Uno, #13, #12, #11) and the above for CS/DC
+Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC);
 
 const int buzzer = 12; 
 const int led = 47;
@@ -77,20 +91,29 @@ StaticJsonDocument<200> docCall;
 StaticJsonDocument<200> docRecall;
 StaticJsonDocument<200> docStore;
 bool flagNumber = false;
-int number[4] = {-1,-1,-1,-1};
+bool flagMoveTo = false;
+int number1 = -1;
+int number2 = -1;
+int number3 = -1;
+int number4 = -1;
 int service;
+int x = 0;
+int y = 0;
 
 void setup() {
   pinMode(buzzer, OUTPUT);
   digitalWrite(buzzer,LOW);
-  delay(100);
-  
-//  digitalWrite(buzzer,LOW);
-//  delay(100);
-//  tone(buzzer, 1000, 500);
-//  delay(1000);
-//  noTone(buzzer);     // Stop sound...
-//  delay(1000);
+
+  // LCD start
+  tft.begin();
+  flag(ILI9341_CYAN);
+
+//  testFastLines(ILI9341_RED, ILI9341_BLUE);
+  tft.setRotation(3);
+  tft.fillScreen(ILI9341_WHITE);
+  login();
+  menubar();
+
   // initialize the ethernet device
   Ethernet.begin(mac, ip, gateway, subnet);
   // start listening for clients
@@ -102,7 +125,7 @@ void setup() {
     ; // wait for serial port to connect. Needed for Leonardo only
   }
 
-  Serial.print("Chat server address:");
+  Serial.print("Client address:");
   Serial.println(Ethernet.localIP());
   
   delay(1000);
@@ -113,9 +136,6 @@ void loop() {
 
 //  readserial();
   getkey();
-//  client.flush();
-//  client.println("check!");
-//  delay(1000);
   if (client) {
     if (!alreadyConnected) {
       // clear out the input buffer:
@@ -140,6 +160,7 @@ void loop() {
     
   }
   Ethernet.maintain();
+  
 }
 
 
@@ -158,10 +179,10 @@ void parser(){
     Serial.print(docParser["number"][2].as<int>());
     Serial.print(docParser["number"][3].as<int>());
     
-    number[0] = docParser["number"][0].as<int>();
-    number[1] = docParser["number"][1].as<int>();
-    number[2] = docParser["number"][2].as<int>();
-    number[3] = docParser["number"][3].as<int>();
+    number1 = docParser["number"][0].as<int>();
+    number2 = docParser["number"][1].as<int>();
+    number3 = docParser["number"][2].as<int>();
+    number4 = docParser["number"][3].as<int>();
 
     service = docParser["service"].as<int>();
     flagNumber = true;
@@ -172,12 +193,16 @@ void getkey(){
   char key = keypad.getKey();
   
   if (key != NO_KEY){
+    beep(1);
     switch (key) {
       case 'A':
-        previousKey = key;
-        key2 = false;
-        key3 = false;
-        key4 = false;
+        if(previousKey == 'A') {
+          
+        }
+        menu();
+        break;
+      case 'B':
+        clearChar();
         break;
       case 'D': // Enter
         docEnter["action"] = "enter";
@@ -185,7 +210,11 @@ void getkey(){
         serializeJson(docEnter, client);
 
         enterKey = true;
-        flagNumber = false;     
+        flagNumber = false;
+        number1 = -1;
+        number2 = -1;
+        number3 = -1;
+        number4 = -1;     
         break;
 
       case 'C': //Call
@@ -199,10 +228,10 @@ void getkey(){
             docRecall["action"] = "recall";   
             docRecall["service"] = service;
             JsonArray data = docRecall.createNestedArray("number");
-            data.add(number[0]);
-            data.add(number[1]);
-            data.add(number[2]);
-            data.add(number[3]);
+            data.add(number1);
+            data.add(number2);
+            data.add(number3);
+            data.add(number4);
             serializeJson(docRecall, client);
           } else {
             docCall["action"] = "callnumber";  
@@ -219,26 +248,142 @@ void getkey(){
           docStore["action"] = "addnumber";  
           docStore["service"] = service;
           JsonArray data = docStore.createNestedArray("number");
-          data.add(number[0]);
-          data.add(number[1]);
-          data.add(number[2]);
-          data.add(number[3]);
+          data.add(number1);
+          data.add(number2);
+          data.add(number3);
+          data.add(number4);
           serializeJson(docStore, client);
+          
+          number1 = -1;
+          number2 = -1;
+          number3 = -1;
+          number4 = -1;  
         }
         enterKey = true;
         flagNumber = false;  
         break;
+
+      case '1':
+        Serial.println("key 1");
+        if(flagMoveTo == true) {
+          tft.setTextSize(1);
+          tft.setTextColor(ILI9341_BLACK);
+          x = x + 10;
+          y = 70;
+          tft.setCursor(x, y);
+          tft.printlnUTF8("1");
+        }
+        break;
+      case '2':
+        if(previousKey == 'A') {
+            flagMoveTo = true;
+            clearDisplay();
+            tft.setTextColor(ILI9341_BLUE);  
+            tft.setTextSize(1);
+            tft.setCursor(5, 50);
+            tft.printlnUTF8("Chuyển Đến Dịch Vụ: ");
+            
+        }
+        break;
+        
     }
-    if (key >= '0' && key <='9' && previousKey == 'A'){
+    if (key >= '0' && key <='9' && previousKey == 'A') {
+      
       Serial.print(key);
       delay(100);
     }
     
     Serial.print(key);
-    beep(1);
+    previousKey = key;
     
   }
 }
+
+void clearLine(int y) {
+  Serial.println("clear line");
+  tft.setTextColor(ILI9341_BLACK, ILI9341_WHITE);
+  tft.setCursor(0, y);
+  tft.printlnUTF8("                                       ");
+}
+
+void clearChar() {
+  Serial.print("clear char: ");
+  tft.setTextColor(ILI9341_BLACK, ILI9341_WHITE);
+  tft.setCursor(x , y);
+  if (x - 10 > 0) {
+      x = x - 10;
+  }
+  Serial.println(x);
+  tft.printlnUTF8("  ");
+}
+
+void clearDisplay() {
+  tft.fillScreen(ILI9341_WHITE);
+  menubar();
+  getStateConnection();
+}
+
+unsigned long flag(uint16_t color) {
+  unsigned long start, t;
+  int           x1, y1, x2, y2,
+                w = tft.width(),
+                h = tft.height();
+
+  tft.fillScreen(ILI9341_BLACK);
+  yield();
+  
+  x1 = y1 = 0;
+  y2    = h - 1;
+  start = micros();
+  for(x2=0; x2<w; x2+=6) tft.drawLine(x1, y1, x2, y2, color);
+  x2    = w - 1;
+  for(y2=0; y2<h; y2+=6) tft.drawLine(x1, y1, x2, y2, color);
+
+}
+unsigned long login() {
+  int w = tft.width(),
+      h = tft.height();
+  tft.setCursor(5, 0);
+  tft.setTextColor(ILI9341_DARKCYAN);  
+  tft.setTextSize(2);
+//  tft.setFont(&FreeSerif9pt7b);
+  tft.printlnUTF8("QSystem");
+ 
+}
+unsigned long menubar() { //
+  int          x1, y1, x2, y2,
+                w = tft.width(),
+                h = tft.height();
+  tft.setCursor(5, 0);
+  tft.setTextColor(ILI9341_DARKCYAN);  
+  tft.setTextSize(2);
+  tft.printlnUTF8("QSystem");
+  
+  tft.setTextSize(3);
+  tft.drawLine(0, 35, w, 35, ILI9341_DARKCYAN);
+  tft.drawLine(0, 36, w, 36, ILI9341_DARKCYAN);
+  tft.drawLine(0, 222, w, 222, ILI9341_DARKCYAN);
+  tft.drawLine(0, 223, w, 223, ILI9341_DARKCYAN);
+  
+}
+
+unsigned long menu() { //
+  int          x1, y1, x2, y2,
+                w = tft.width(),
+                h = tft.height();
+ 
+  tft.setTextColor(ILI9341_BLUE);  
+  tft.setTextSize(1);//  tft.setFont(&Cousine_Regular_16);
+  tft.setCursor(5, 50);
+  tft.printlnUTF8("1.Đăng Nhập");
+  tft.setCursor(5, 70);
+  tft.printlnUTF8("2.Chuyển Dịch Vụ");
+  tft.setCursor(5, 90);
+  tft.printlnUTF8("3.Số Lượng Khách");
+  tft.setCursor(5, 110);
+  tft.printlnUTF8("4.Đăng Xuất");
+}
+
 void readserial(){
     // nếu còn có thể đọc được 
   if (Serial1.available() > 0) {
@@ -259,6 +404,22 @@ void readserial(){
     str = "";
     delay(1000);
 
+  }
+}
+
+void getStateConnection() {
+  tft.setTextSize(1);
+  tft.setTextColor(ILI9341_DARKCYAN); 
+  if (alreadyConnected) {
+    clearLine(223);
+    tft.setCursor(225, 223);
+    tft.printUTF8("Đã Kết Nối!");
+//    Serial.println("Đã Kết Nối!");
+  } else {
+    clearLine(223);
+    tft.setCursor(220, 223);
+    tft.printUTF8("Ngắt Kết Nối!");
+//    Serial.println("Ngắt Kết Nối!");
   }
 }
 
