@@ -72,11 +72,11 @@ byte mac[] = {
   0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED
 };
 
-const char ipstring[15] = "192.168.0.177";
-IPAddress ip(192,168,0,177);
-IPAddress gateway(192, 168, 0, 1);
+const char ipstring[15] = "192.168.1.177";
+IPAddress ip(192,168,1,177);
+IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
-IPAddress ipServer(192, 168, 0, 100);
+IPAddress ipServer(192, 168, 1, 100);
 
 
 // telnet defaults to port 23
@@ -92,6 +92,7 @@ StaticJsonDocument<200> docRecall;
 StaticJsonDocument<200> docStore;
 bool flagNumber = false;
 bool flagMoveTo = false;
+bool flagLogin = false;
 int number1 = -1;
 int number2 = -1;
 int number3 = -1;
@@ -109,7 +110,7 @@ void setup() {
   flag(ILI9341_CYAN);
 
 //  testFastLines(ILI9341_RED, ILI9341_BLUE);
-  tft.setRotation(3);
+  tft.setRotation(1);
   tft.fillScreen(ILI9341_WHITE);
   login();
   menubar();
@@ -196,6 +197,7 @@ void getkey(){
     beep(1);
     switch (key) {
       case 'A':
+        clearDisplay();
         if(previousKey == 'A') {
           
         }
@@ -265,7 +267,7 @@ void getkey(){
 
       case '1':
         Serial.println("key 1");
-        if(flagMoveTo == true) {
+        if(flagMoveTo == true || flagLogin == true) {
           tft.setTextSize(1);
           tft.setTextColor(ILI9341_BLACK);
           x = x + 10;
@@ -273,6 +275,16 @@ void getkey(){
           tft.setCursor(x, y);
           tft.printlnUTF8("1");
         }
+//        data0 = "{\"timestamp\":1564658642,\"action\":\"login\",\"subject_type\":\"user\",\"user_id\":1,\"counter_ip\": \"192.168.0.177\"}"; //login
+        if(previousKey == 'A') {
+            flagLogin = true;
+            clearDisplay();
+            tft.setTextColor(ILI9341_BLUE);  
+            tft.setTextSize(1);
+            tft.setCursor(5, 50);
+            tft.printlnUTF8("Mã số đăng nhập: ");
+        }
+        
         break;
       case '2':
         if(previousKey == 'A') {
@@ -423,7 +435,7 @@ void getStateConnection() {
   }
 }
 
-void beep(int number){
+void beep(int number) {
   for (int i = 0; i <= number; i++) {
     digitalWrite(buzzer, HIGH);
     delay(20);
